@@ -188,4 +188,139 @@ var pb=document.createElement("div");pb.className="card";pb.id="penBox";
 pb.innerHTML='<h2>Saya bertugas sebagai</h2><div class="seg"><button data-p="1">Panitia 1</button><button data-p="2">Panitia 2</button></div><div class="msg" id="penMsg" style="margin-top:6px"></div>';
 $("cards").parentNode.insertBefore(pb,$("cards"));
 var cc=document.createElement("div");cc.className="card";cc.id="cmpCard";
-cc
+cc.innerHTML='<h2>Pembanding Panitia 1 vs 2</h2><div style="overflow-x:auto"><table class="cm"><thead><tr><th>Calon</th><th class="n">P1</th><th class="n">P2</th><th class="n">Selisih</th></tr></thead><tbody id="cmBody"></tbody></table></div>';
+$("rekapCard").parentNode.insertBefore(cc,$("rekapCard").nextSibling);
+var vv=document.createElement("div");vv.className="ver";vv.id="ver";
+$("lead").parentNode.insertBefore(vv,$("lead").nextSibling);
+pb.addEventListener("click",function(e){
+var b=e.target.closest("button");if(!b)return;
+SEL=+b.dataset.p;
+try{localStorage.setItem("qc_p",String(SEL))}catch(x){}
+render();
+});
+
+async function load(){
+var r=await SB.from("suara").select("id,calon,oleh,penginput,created_at").order("created_at",{ascending:true}).limit(2000);
+if(r.error){setSt("off","Gagal memuat, cek sinyal");return}
+V=r.data;setSt("on","Live · tersambung");render();
+}
+function cnt(p){var c=[0,0,0],b=0;V.forEach(function(x){if(x.penginput!==p)return;if(x.calon===-1)b++;else if(c[x.calon]!==undefined)c[x.calon]++});return{c:c,b:b}}
+function verif(o,w){
+var d=0;[0,1,2].forEach(function(i){d+=Math.abs(o.c[i]-w.c[i])});d+=Math.abs(o.b-w.b);
+var n=o.c[0]+o.c[1]+o.c[2]+o.b+w.c[0]+w.c[1]+w.c[2]+w.b;
+return{d:d,n:n,ok:n>0&&d===0};
+}
+function render(){
+var o=cnt(1),w=cnt(2),mv=(me&&SEL)?SEL:1,r=cnt(mv),vf=verif(o,w);
+var sah=o.c[0]+o.c[1]+o.c[2],tot=sah+o.b,mx=Math.max(o.c[0],o.c[1],o.c[2]);
+var lead=[0,1,2].filter(function(i){return o.c[i]===mx});
+var sisa=Math.max(0,WARGA-tot);
+$("tot").textContent=tot;$("sah").textContent=sah;$("bad").textContent=o.b;$("sisa").textContent=sisa;
+$("lead").textContent=sah===0?"Belum ada suara masuk":lead.length===1?"Unggul sementara: No. "+(lead[0]+1)+" "+N[lead[0]]:"Sementara seri";
+$("ver").className="ver "+(vf.ok?"ok":"no");
+$("ver").textContent=vf.n===0?"":vf.ok?"✓ Terverifikasi: hitungan Panitia 1 dan 2 cocok":"⚠ Belum cocok: selisih "+vf.d+" suara, cek ulang";
+Array.prototype.forEach.call(pb.querySelectorAll("[data-p]"),function(b){b.classList.toggle("on",+b.dataset.p===SEL)});
+$("penMsg").textContent=SEL?"Angka di kartu = hitungan Panitia "+SEL+" saja.":"Pilih dulu Panitia 1 atau 2 sebelum menekan +1.";
+var rs=r.c[0]+r.c[1]+r.c[2];
+var h=N.map(function(n,i){var v=r.c[i];return '<div class="card cd" style="--cc:var(--c'+i+')"><div class="top"><img class="fto" alt="Foto '+n+'" src="'+FT[i]+'"><div class="no">'+(i+1)+'</div><div class="nm">'+n+'</div></div><div class="big">'+v+'</div><div class="bar"><i style="width:'+(rs?v/rs*100:0)+'%"></i></div><div class="pc">'+pct(v,rs)+'% dari suara sah</div><div class="bt"><button class="plus" data-k="'+i+'">+1 Suara</button><button class="min" data-m="'+i+'" aria-label="Kurangi suara '+n+'">−1</button></div></div>'}).join("");
+h+='<div class="card cd bd"><div class="top"><div class="no">✕</div><div class="nm">Suara tidak sah</div></div><div class="big">'+r.b+'</div><div class="bt"><button class="plus" data-k="-1">+1 Tidak sah</button><button class="min" data-m="-1" aria-label="Kurangi suara tidak sah">−1</button></div></div>';
+$("cards").innerHTML=h;
+$("rkBody").innerHTML=N.map(function(n,i){var v=o.c[i];return '<tr class="'+(mx>0&&v===mx?'u':'')+'"><td><b>'+(i+1)+'</b></td><td><img class="thumb" alt="" src="'+FT[i]+'">'+n+'</td><td class="n">'+v+'</td><td class="n">'+pct(v,sah)+'%</td></tr>'}).join("");
+$("rkFoot").innerHTML='<tr><td></td><td>Total suara sah</td><td class="n">'+sah+'</td><td class="n">'+(sah?'100,0':'0,0')+'%</td></tr>'
++'<tr><td></td><td>Suara tidak sah</td><td class="n">'+o.b+'</td><td class="n"></td></tr>'
++'<tr><td></td><td>Total surat masuk</td><td class="n">'+tot+'</td><td class="n">'+pct(tot,WARGA)+'%</td></tr>'
++'<tr><td></td><td>Jumlah surat tersisa (dari '+WARGA+' warga)</td><td class="n">'+sisa+'</td><td class="n"></td></tr>';
+function selc(a,b){var s=a-b;return s===0?'<td class="n okc">✓</td>':'<td class="n bdc">'+(s>0?"+":"")+s+'</td>'}
+var cm=N.map(function(n,i){return '<tr><td>'+(i+1)+'. '+n+'</td><td class="n">'+o.c[i]+'</td><td class="n">'+w.c[i]+'</td>'+selc(o.c[i],w.c[i])+'</tr>'}).join("");
+cm+='<tr><td>Tidak sah</td><td class="n">'+o.b+'</td><td class="n">'+w.b+'</td>'+selc(o.b,w.b)+'</tr>';
+var t1=sah+o.b,t2=w.c[0]+w.c[1]+w.c[2]+w.b;
+cm+='<tr><td><b>Total</b></td><td class="n">'+t1+'</td><td class="n">'+t2+'</td>'+selc(t1,t2)+'</tr>';
+$("cmBody").innerHTML=cm;
+var ctr={};V.forEach(function(x){ctr[x.penginput]=(ctr[x.penginput]||0)+1;x._n=ctr[x.penginput]});
+$("log").innerHTML=V.length?V.slice(-8).reverse().map(function(x){return '<div class="lg"><b>P'+(x.penginput||"?")+' #'+kode(x._n)+' · '+(x.calon===-1?"Tidak sah":"No. "+(x.calon+1)+" "+N[x.calon])+(me&&x.oleh===me.id?" · Anda":"")+'</b><span>'+hm(x.created_at)+'</span></div>'}).join(""):'<div class="msg">Belum ada input</div>';
+}
+
+async function add(k){
+if(!me)return;
+if(!SEL){toast("Pilih dulu: Panitia 1 atau 2");return}
+try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+var n=V.filter(function(x){return x.penginput===SEL}).length+1;
+toast("P"+SEL+" #"+kode(n)+" · "+(k===-1?"Suara tidak sah":"No. "+(k+1)+" "+N[k]));
+var tmp={id:"tmp"+Date.now()+Math.random(),calon:k,oleh:me.id,penginput:SEL,created_at:new Date().toISOString()};
+V.push(tmp);render();
+var r=await SB.from("suara").insert({calon:k,penginput:SEL});
+if(r.error){V=V.filter(function(x){return x!==tmp});render();setSt("off","Gagal menyimpan, tekan lagi")}else load();
+}
+async function del(row){
+if(!row||!me)return;
+V=V.filter(function(x){return x!==row});render();
+if(String(row.id).indexOf("tmp")===0){load();return}
+var r=await SB.from("suara").delete().eq("id",row.id);
+if(r.error)setSt("off","Gagal membatalkan, coba lagi");
+load();
+}
+function lastOf(f){for(var i=V.length-1;i>=0;i--){if(f(V[i]))return V[i]}return null}
+$("cards").addEventListener("click",function(e){
+var b=e.target.closest("button");if(!b)return;
+if(!SEL){toast("Pilih dulu: Panitia 1 atau 2");return}
+if(b.dataset.k!==undefined)add(+b.dataset.k);
+else if(b.dataset.m!==undefined){var k=+b.dataset.m;del(lastOf(function(x){return x.calon===k&&x.penginput===SEL}))}
+});
+$("undo").onclick=function(){if(me&&SEL)del(lastOf(function(x){return x.oleh===me.id&&x.penginput===SEL}))};
+
+function applyAuth(){
+document.body.classList.toggle("lihat",!me);
+$("loginBox").classList.toggle("hide",!!me);
+$("userBox").classList.toggle("hide",!me);
+$("who").textContent=me?"Masuk sebagai "+me.email:"";
+render();
+}
+$("masuk").onclick=async function(){
+var e=$("em").value.trim(),p=$("pw").value;
+if(!e||!p){am("Isi email dan password dulu.",1);return}
+am("Memproses…");
+var r=await SB.auth.signInWithPassword({email:e,password:p});
+if(r.error)am(tr(r.error.message),1);else{am("");$("pw").value=""}
+};
+$("daftar").onclick=async function(){
+var e=$("em").value.trim(),p=$("pw").value;
+if(!e||!p){am("Isi email dan password dulu.",1);return}
+if(p.length<6){am("Password minimal 6 karakter.",1);return}
+am("Memproses…");
+var r=await SB.auth.signUp({email:e,password:p});
+if(r.error)am(tr(r.error.message),1);
+else if(!r.data.session)am("Akun dibuat. Cek email untuk konfirmasi, lalu tekan Masuk.");
+else{am("");$("pw").value=""}
+};
+$("keluar").onclick=function(){SB.auth.signOut()};
+
+function setLayar(on){
+document.body.classList.toggle("layar",on);
+if(on){try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(function(){})}catch(e){}try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(function(){})}catch(e){}}
+else if(document.fullscreenElement){try{document.exitFullscreen()}catch(e){}}
+}
+$("layar").onclick=function(){setLayar(true)};
+$("exit").onclick=function(){setLayar(false)};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")setLayar(false)});
+
+function rekap(){
+var o=cnt(1),w=cnt(2),vf=verif(o,w),sah=o.c[0]+o.c[1]+o.c[2],tot=sah+o.b,d=new Date();
+var t="HITUNG CEPAT PEMILIHAN KETUA RT 004 RW 006\nVilla Athaland Sindangmulya 2026\nWaktu: "+d.toLocaleDateString("id-ID")+" "+hm(d)+"\n\n";
+N.forEach(function(n,i){t+=(i+1)+". "+n+": "+o.c[i]+" suara ("+pct(o.c[i],sah)+"%)\n"});
+return t+"\nSuara sah: "+sah+"\nTidak sah: "+o.b+"\nTotal suara masuk: "+tot+"\nSurat tersisa: "+Math.max(0,WARGA-tot)+" (dari "+WARGA+" warga)\n\nStatus: "+(vf.n===0?"belum ada input":vf.ok?"terverifikasi (Panitia 1 dan 2 cocok)":"belum cocok, selisih "+vf.d+" suara")+"\n(Hasil sementara hitung cepat)";
+}
+$("cp").onclick=function(){
+var t=rekap();
+var show=function(){$("ta").style.display="block";$("ta").value=t;$("ta").focus();$("ta").select();say("Salin teks di atas lalu kirim ke grup.")};
+try{navigator.clipboard.writeText(t).then(function(){say("Rekap disalin, tinggal tempel di grup.")},show)}catch(e){show()}
+};
+
+render();
+SB.auth.getSession().then(function(s){me=s.data.session?s.data.session.user:null;applyAuth()});
+SB.auth.onAuthStateChange(function(_e,s){me=s?s.user:null;applyAuth()});
+load();
+SB.channel("suara-rt").on("postgres_changes",{event:"*",schema:"public",table:"suara"},function(){load()}).subscribe();
+setInterval(load,8000);
+</script>
+</body>
+</html>
